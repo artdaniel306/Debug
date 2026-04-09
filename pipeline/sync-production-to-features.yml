@@ -48,15 +48,7 @@ steps:
           git merge --abort 2>/dev/null || true  # ← 修正問題 2
 
           # 修正問題 3，改用變數存放 JSON 再傳入
-          PR_PAYLOAD=$(cat <<EOF
-          {
-            "title": "[Auto] Sync production → $BRANCH (conflict)",
-            "body": "production 有更新，自動 merge 時發現衝突，請手動解決。",
-            "head": "production",
-            "base": "$BRANCH"
-          }
-EOF
-          )
+          PR_PAYLOAD="{\"title\": \"[Auto] Sync production → $BRANCH (conflict)\", \"body\": \"production 有更新，自動 merge 時發現衝突，請手動解決。\", \"head\": \"production\", \"base\": \"$BRANCH\"}"
 
           curl -s -X POST \
             -H "Authorization: token $(GITHUB_PAT)" \
