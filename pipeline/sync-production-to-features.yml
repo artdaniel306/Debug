@@ -1,30 +1,29 @@
 trigger:
   branches:
     include:
-      - production   # 只有 production branch 有變動時才觸發
+      - production
 
 pool:
   vmImage: 'ubuntu-latest'
 
 variables:
-  # 這些變數會在 Step 2 設定
-  AZURE_DEVOPS_ORG: $(System.TeamFoundationCollectionUri)
-  PROJECT_NAME: $(System.TeamProject)
-  REPO_NAME: $(Build.Repository.Name)
+  - group: Daniel_CI_Debug  # ← 替換成你在 Library 建立的 Variable Group 名稱
 
 steps:
   - checkout: self
-    persistCredentials: true   # 讓 git 指令可以使用認證
+    persistCredentials: true
 
   - script: |
-      # 設定 git 身份
-      git config user.email "daniel.li@artsolutions.io"
-      git config user.name "Azure Pipeline Bot"
+      git config user.email "daniel.li@artsolutions.io"  # ← 可替換成你們團隊的 email
+      git config user.name "Azure Pipeline Bot"          # ← 可替換成任意顯示名稱
 
-      # 取得所有遠端 branch
+      # 設定 GitHub 認證，讓 git push 可以使用 PAT
+      git remote set-url origin https://$(GITHUB_PAT)@github.com/artdaniel306/Debug.git
+      # ↑ 替換 YOUR_ORG（GitHub username 或 org name）
+      # ↑ 替換 YOUR_REPO（repo name）
+
       git fetch --all
 
-      # 列出所有 feature branch
       FEATURE_BRANCHES=$(git branch -r | grep 'origin/feature/' | sed 's|origin/||' | tr -d ' ')
 
       if [ -z "$FEATURE_BRANCHES" ]; then
@@ -37,33 +36,28 @@ steps:
         echo "Processing branch: $BRANCH"
         echo "========================================="
 
-        # 切換到 feature branch
         git checkout $BRANCH
 
-        # 嘗試 merge production
         if git merge origin/production --no-edit; then
           echo "✅ Merge successful for $BRANCH, pushing..."
           git push origin $BRANCH
         else
-          echo "⚠️ Merge conflict on $BRANCH, creating PR..."
+          echo "⚠️ Merge conflict on $BRANCH, creating GitHub PR..."
           git merge --abort
 
-          # 呼叫 REST API 建立 PR
-          PR_TITLE="[Auto] Sync production → $BRANCH (conflict)"
-          PR_BODY="production 有更新，自動 merge 時發現衝突，請手動解決。"
-
           curl -s -X POST \
-            "$AZURE_DEVOPS_ORG$PROJECT_NAME/_apis/git/repositories/$REPO_NAME/pullrequests?api-version=7.1" \
-            -H "Content-Type: application/json" \
-            -H "Authorization: Bearer $(System.AccessToken)" \
+            -H "Authorization: token $(GITHUB_PAT)" \
+            -H "Accept: application/vnd.github+json" \
+            https://api.github.com/repos/artdaniel306/Debug/pulls \
+            # ↑ 替換 YOUR_ORG 與 YOUR_REPO
             -d "{
-              \"title\": \"$PR_TITLE\",
-              \"description\": \"$PR_BODY\",
-              \"sourceRefName\": \"refs/heads/production\",
-              \"targetRefName\": \"refs/heads/$BRANCH\"
+              \"title\": \"[Auto] Sync production → $BRANCH (conflict)\",
+              \"body\": \"production 有更新，自動 merge 時發現衝突，請手動解決。\",
+              \"head\": \"production\",
+              \"base\": \"$BRANCH\"
             }"
         fi
       done
     displayName: 'Sync production to all feature branches'
     env:
-      SYSTEM_ACCESSTOKEN: $(System.AccessToken)  # 注入 Pipeline 的 token
+      GITHUB_PAT: $(GITHUB_PAT)  # 從 Variable Group 注入
