@@ -7,20 +7,22 @@ pool:
   vmImage: 'ubuntu-latest'
 
 variables:
-  - group: Daniel_CI_Debug  # ← 替換成你在 Library 建立的 Variable Group 名稱
+  - group: Daniel_CI_Debug
+  - name: GITHUB_ORG
+    value: 'artdaniel306'
+  - name: GITHUB_REPO
+    value: 'Debug'
 
 steps:
   - checkout: self
     persistCredentials: true
+    fetchDepth: 0  # ← 修正問題 1，抓完整 git 歷史
 
   - script: |
-      git config user.email "daniel.li@artsolutions.io"  # ← 可替換成你們團隊的 email
-      git config user.name "Azure Pipeline Bot"          # ← 可替換成任意顯示名稱
+      git config user.email "daniel.li@artsolutions.io"
+      git config user.name "Azure Pipeline Bot"
 
-      # 設定 GitHub 認證，讓 git push 可以使用 PAT
-      git remote set-url origin https://$(GITHUB_PAT)@github.com/artdaniel306/Debug.git
-      # ↑ 替換 YOUR_ORG（GitHub username 或 org name）
-      # ↑ 替換 YOUR_REPO（repo name）
+      git remote set-url origin https://$(GITHUB_PAT)@github.com/$(GITHUB_ORG)/$(GITHUB_REPO).git
 
       git fetch --all
 
@@ -43,21 +45,19 @@ steps:
           git push origin $BRANCH
         else
           echo "⚠️ Merge conflict on $BRANCH, creating GitHub PR..."
-          git merge --abort
+          git merge --abort 2>/dev/null || true  # ← 修正問題 2
+
+          # 修正問題 3，改用變數存放 JSON 再傳入
+          PR_PAYLOAD="{\"title\": \"[Auto] Sync production → $BRANCH (conflict)\", \"body\": \"production 有更新，自動 merge 時發現衝突，請手動解決。\", \"head\": \"production\", \"base\": \"$BRANCH\"}"
 
           curl -s -X POST \
             -H "Authorization: token $(GITHUB_PAT)" \
             -H "Accept: application/vnd.github+json" \
-            https://api.github.com/repos/artdaniel306/Debug/pulls \
-            # ↑ 替換 YOUR_ORG 與 YOUR_REPO
-            -d "{
-              \"title\": \"[Auto] Sync production → $BRANCH (conflict)\",
-              \"body\": \"production 有更新，自動 merge 時發現衝突，請手動解決。\",
-              \"head\": \"production\",
-              \"base\": \"$BRANCH\"
-            }"
+            -H "Content-Type: application/json" \
+            https://api.github.com/repos/$(GITHUB_ORG)/$(GITHUB_REPO)/pulls \
+            -d "$PR_PAYLOAD"
         fi
       done
     displayName: 'Sync production to all feature branches'
     env:
-      GITHUB_PAT: $(GITHUB_PAT)  # 從 Variable Group 注入
+      GITHUB_PAT: $(GITHUB_PAT)
