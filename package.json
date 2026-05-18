@@ -1,11 +1,11 @@
 {
   "name": "my-electron-app",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "My first Electron desktop application",
   "main": "main.js",
   "author": {
-    "name": "Your Name",
-    "email": "your@email.com"
+    "name": "Daniel Li",
+    "email": "daniel.li@artsolutions.io"
   },
   "scripts": {
     "start": "electron .",
@@ -65,8 +65,8 @@
     },
     "publish": {
       "provider": "github",
-      "owner": "your-github-username",
-      "repo": "your-repo-name"
+      "owner": "artdaniel306",
+      "repo": "Debug"
     }
   }
 }
