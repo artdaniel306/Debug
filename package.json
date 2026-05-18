@@ -1,14 +1,71 @@
 {
   "name": "my-electron-app",
   "version": "1.0.0",
-  "description": "我的第一個 Electron 應用",
+  "description": "My first Electron desktop application",
   "main": "main.js",
-  "scripts": {
-    "start": "electron ."
+  "author": {
+    "name": "Your Name",
+    "email": "your@email.com"
   },
-  "author": "Your Name",
-  "license": "MIT",
-  "devDependencies": {
-    "electron": "^42.1.0"
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder",
+    "build:win": "electron-builder --win",
+    "build:mac": "electron-builder --mac",
+    "build:linux": "electron-builder --linux",
+    "build:all": "electron-builder -mwl",
+    "release": "electron-builder --publish always"
+  },
+  "build": {
+    "appId": "com.yourcompany.my-electron-app",
+    "productName": "My Electron App",
+    "copyright": "Copyright © 2025 Your Name",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "renderer.js",
+      "index.html",
+      "node_modules/**/*"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64", "ia32"]
+        }
+      ],
+      "icon": "build/icon.ico"
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": ["x64", "arm64"]
+        }
+      ],
+      "icon": "build/icon.icns",
+      "category": "public.app-category.utilities"
+    },
+    "linux": {
+      "target": ["AppImage", "deb"],
+      "icon": "build/icon.png",
+      "category": "Utility"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "My Electron App"
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "your-github-username",
+      "repo": "your-repo-name"
+    }
   }
 }

@@ -1,8 +1,10 @@
 // preload.js
-const { contextBridge } = require("electron");
- 
-contextBridge.exposeInMainWorld("versions", {
-  node: () => process.versions.node,
-  chrome: () => process.versions.chrome,
-  electron: () => process.versions.electron,
-});
+const { contextBridge, ipcRenderer } = require('electron')
+
+contextBridge.exposeInMainWorld('electronAPI', {
+  onUpdateAvailable: (callback) =>
+    ipcRenderer.on('update-available', (_event, info) => callback(info)),
+  onUpdateDownloaded: (callback) =>
+    ipcRenderer.on('update-downloaded', (_event, info) => callback(info)),
+  installUpdate: () => ipcRenderer.send('install-update'),
+})
