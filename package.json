@@ -22,14 +22,15 @@
     "copyright": "Copyright © 2025 Your Name",
     "directories": {
       "output": "dist",
-      "buildResources": "build"
+      "buildResources": "."
     },
     "files": [
       "main.js",
       "preload.js",
       "renderer.js",
       "index.html",
-      "node_modules/**/*"
+      "node_modules/**/*",
+      "!dist/**/*"
     ],
     "win": {
       "target": [
@@ -38,7 +39,7 @@
           "arch": ["x64", "ia32"]
         }
       ],
-      "icon": "build/icon.ico"
+      "icon": "build/icons/win/icon.ico"
     },
     "mac": {
       "target": [
@@ -47,12 +48,12 @@
           "arch": ["x64", "arm64"]
         }
       ],
-      "icon": "build/icon.icns",
+      "icon": "build/icons/mac/icon.icns",
       "category": "public.app-category.utilities"
     },
     "linux": {
       "target": ["AppImage", "deb"],
-      "icon": "build/icon.png",
+      "icon": "build/icons/png/512x512.png",
       "category": "Utility"
     },
     "nsis": {
