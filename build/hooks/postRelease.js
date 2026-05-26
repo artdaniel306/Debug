@@ -4,8 +4,9 @@ const { BlobServiceClient } = require("@azure/storage-blob");
 const path = require("path");
 const fs = require("fs");
 
-// electron-builder.env is loaded by electron-builder internally but not by standalone scripts.
-// We parse it here so credentials are available without requiring them to be pre-exported.
+const UPLOAD_EXTENSIONS = [".exe", ".blockmap", ".yml", ".dmg", ".AppImage", ".deb"];
+
+// electron-builder.env is loaded internally by electron-builder but not by standalone scripts.
 function loadEnvFile(filePath) {
     if (!fs.existsSync(filePath)) return;
     for (const line of fs.readFileSync(filePath, "utf8").split(/\r?\n/)) {
@@ -16,7 +17,7 @@ function loadEnvFile(filePath) {
     }
 }
 
-async function uploadYmlFiles() {
+async function uploadArtifacts() {
     loadEnvFile("electron-builder.env");
 
     const connectionString = process.env.AZURE_STORAGE_CONNECTION_STRING;
@@ -31,40 +32,45 @@ async function uploadYmlFiles() {
     }
 
     const outDir = "dist";
-    const ymlFiles = fs.readdirSync(outDir)
-        .filter(f => f.endsWith(".yml"))
+    const allFiles = fs.readdirSync(outDir)
+        .filter(f => UPLOAD_EXTENSIONS.includes(path.extname(f).toLowerCase()))
         .map(f => path.join(outDir, f));
 
-    if (ymlFiles.length === 0) {
-        console.warn("[postRelease] dist/ 中未找到 .yml 檔案，略過上傳。");
+    if (allFiles.length === 0) {
+        console.warn("[postRelease] dist/ 中未找到可上傳的檔案。");
         return;
     }
+
+    // Non-yml files first, then other yml files, then latest.yml last.
+    // This ensures installers are available before clients detect a new version via latest.yml.
+    const nonYmlFiles = allFiles.filter(f => path.extname(f).toLowerCase() !== ".yml");
+    const ymlFiles = allFiles.filter(f => path.extname(f).toLowerCase() === ".yml");
+    const latestYml = ymlFiles.find(f => path.basename(f) === "latest.yml");
+    const otherYmlFiles = ymlFiles.filter(f => path.basename(f) !== "latest.yml");
+    const orderedFiles = [...nonYmlFiles, ...otherYmlFiles, ...(latestYml ? [latestYml] : [])];
 
     const containerClient = BlobServiceClient
         .fromConnectionString(connectionString)
         .getContainerClient(containerName);
 
-    // latest.yml must be uploaded last so clients don't detect a new version
-    // before the installers finish uploading (installers are handled by afterAllArtifactBuild).
-    const latestYml = ymlFiles.find(f => path.basename(f) === "latest.yml");
-    const otherYmlFiles = ymlFiles.filter(f => path.basename(f) !== "latest.yml");
-    const orderedYmlFiles = [...otherYmlFiles, ...(latestYml ? [latestYml] : [])];
+    console.log(`[postRelease] 準備上傳 ${orderedFiles.length} 個檔案至 Azure Blob...`);
 
-    console.log(`[postRelease] 準備上傳 ${orderedYmlFiles.length} 個 yml 檔案至 Azure Blob...`);
-
-    for (const filePath of orderedYmlFiles) {
+    for (const filePath of orderedFiles) {
         const fileName = path.basename(filePath);
         const blobName = `${blobPrefix}${fileName}`;
         const blockBlobClient = containerClient.getBlockBlobClient(blobName);
-        await blockBlobClient.deleteIfExists();
+        // yml files reuse the same blob name across releases, so delete first to guarantee overwrite.
+        if (path.extname(filePath).toLowerCase() === ".yml") {
+            await blockBlobClient.deleteIfExists();
+        }
         await blockBlobClient.uploadFile(filePath);
         console.log(`[postRelease] 已上傳: ${blobName}`);
     }
 
-    console.log("[postRelease] yml 上傳完成。");
+    console.log("[postRelease] 上傳完成。");
 }
 
-uploadYmlFiles().catch(err => {
+uploadArtifacts().catch(err => {
     console.error("[postRelease] 上傳失敗:", err);
     process.exit(1);
 });
