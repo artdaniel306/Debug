@@ -73,9 +73,8 @@
       "shortcutName": "My Electron App"
     },
     "publish": {
-      "provider": "github",
-      "owner": "artdaniel306",
-      "repo": "Debug"
+      "provider": "generic",
+      "url": "https://updayservice.blob.core.windows.net/upagent/releases/"
     }
   },
   "dependencies": {
