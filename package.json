@@ -72,6 +72,7 @@
       "createStartMenuShortcut": true,
       "shortcutName": "My Electron App"
     },
+    "afterAllArtifactBuild": "build/hooks/afterAllArtifactBuild.js",
     "publish": {
       "provider": "generic",
       "url": "https://updayservice.blob.core.windows.net/upagent/releases/"
