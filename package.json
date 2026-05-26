@@ -14,7 +14,7 @@
     "build:mac": "electron-builder --mac",
     "build:linux": "electron-builder --linux",
     "build:all": "electron-builder -mwl",
-    "release": "electron-builder --publish always"
+    "release": "electron-builder --publish always && node build/hooks/postRelease.js"
   },
   "build": {
     "appId": "com.yourcompany.my-electron-app",

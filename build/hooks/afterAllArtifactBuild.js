@@ -3,7 +3,9 @@
 const { BlobServiceClient } = require("@azure/storage-blob");
 const path = require("path");
 
-const UPLOAD_EXTENSIONS = [".exe", ".blockmap", ".yml", ".dmg", ".AppImage", ".deb"];
+// latest.yml is generated AFTER this hook runs (in publishManager.awaitTasks),
+// so .yml is intentionally excluded here. See build/hooks/postRelease.js for yml upload.
+const UPLOAD_EXTENSIONS = [".exe", ".blockmap", ".dmg", ".AppImage", ".deb"];
 
 exports.default = async function afterAllArtifactBuild(context) {
     const connectionString = process.env.AZURE_STORAGE_CONNECTION_STRING;
@@ -21,29 +23,16 @@ exports.default = async function afterAllArtifactBuild(context) {
         .fromConnectionString(connectionString)
         .getContainerClient(containerName);
 
-    const allFiles = context.artifactPaths.filter(p =>
+    const filesToUpload = context.artifactPaths.filter(p =>
         UPLOAD_EXTENSIONS.includes(path.extname(p).toLowerCase())
     );
 
-    // yml files must be uploaded last so installers are available before latest.yml is updated.
-    // latest.yml itself must be the very last file uploaded.
-    const nonYmlFiles = allFiles.filter(p => path.extname(p).toLowerCase() !== ".yml");
-    const ymlFiles = allFiles.filter(p => path.extname(p).toLowerCase() === ".yml");
-    const latestYml = ymlFiles.find(p => path.basename(p) === "latest.yml");
-    const otherYmlFiles = ymlFiles.filter(p => path.basename(p) !== "latest.yml");
-    const orderedFiles = [...nonYmlFiles, ...otherYmlFiles, ...(latestYml ? [latestYml] : [])];
+    console.log(`[afterAllArtifactBuild] 準備上傳 ${filesToUpload.length} 個檔案至 Azure Blob...`);
 
-    console.log(`[afterAllArtifactBuild] 準備上傳 ${orderedFiles.length} 個檔案至 Azure Blob...`);
-
-    for (const filePath of orderedFiles) {
+    for (const filePath of filesToUpload) {
         const fileName = path.basename(filePath);
         const blobName = `${blobPrefix}${fileName}`;
-        const blockBlobClient = containerClient.getBlockBlobClient(blobName);
-        // yml files reuse the same blob name across releases, so delete first to guarantee overwrite.
-        if (path.extname(filePath).toLowerCase() === ".yml") {
-            await blockBlobClient.deleteIfExists();
-        }
-        await blockBlobClient.uploadFile(filePath);
+        await containerClient.getBlockBlobClient(blobName).uploadFile(filePath);
         console.log(`[afterAllArtifactBuild] 已上傳: ${blobName}`);
     }
 
