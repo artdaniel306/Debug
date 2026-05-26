@@ -21,16 +21,29 @@ exports.default = async function afterAllArtifactBuild(context) {
         .fromConnectionString(connectionString)
         .getContainerClient(containerName);
 
-    const filesToUpload = context.artifactPaths.filter(p =>
+    const allFiles = context.artifactPaths.filter(p =>
         UPLOAD_EXTENSIONS.includes(path.extname(p).toLowerCase())
     );
 
-    console.log(`[afterAllArtifactBuild] 準備上傳 ${filesToUpload.length} 個檔案至 Azure Blob...`);
+    // yml files must be uploaded last so installers are available before latest.yml is updated.
+    // latest.yml itself must be the very last file uploaded.
+    const nonYmlFiles = allFiles.filter(p => path.extname(p).toLowerCase() !== ".yml");
+    const ymlFiles = allFiles.filter(p => path.extname(p).toLowerCase() === ".yml");
+    const latestYml = ymlFiles.find(p => path.basename(p) === "latest.yml");
+    const otherYmlFiles = ymlFiles.filter(p => path.basename(p) !== "latest.yml");
+    const orderedFiles = [...nonYmlFiles, ...otherYmlFiles, ...(latestYml ? [latestYml] : [])];
 
-    for (const filePath of filesToUpload) {
+    console.log(`[afterAllArtifactBuild] 準備上傳 ${orderedFiles.length} 個檔案至 Azure Blob...`);
+
+    for (const filePath of orderedFiles) {
         const fileName = path.basename(filePath);
         const blobName = `${blobPrefix}${fileName}`;
-        await containerClient.getBlockBlobClient(blobName).uploadFile(filePath, { overwrite: true });
+        const blockBlobClient = containerClient.getBlockBlobClient(blobName);
+        // yml files reuse the same blob name across releases, so delete first to guarantee overwrite.
+        if (path.extname(filePath).toLowerCase() === ".yml") {
+            await blockBlobClient.deleteIfExists();
+        }
+        await blockBlobClient.uploadFile(filePath);
         console.log(`[afterAllArtifactBuild] 已上傳: ${blobName}`);
     }
 
